@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChassisFind — Intermodal Chassis Availability</title>
+<style>
+  :root {
+    --bg: #0d0f12;
+    --surface: #161a20;
+    --surface2: #1e242d;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8eaed;
+    --muted: #8a94a0;
+    --accent: #00d4aa;
+    --accent2: #0099ff;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --radius: 10px;
+    --font: 'IBM Plex Mono', monospace;
+    --font2: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font2); min-height: 100vh; }
+
+  /* FONTS */
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+  /* TOP NAV */
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 32px; border-bottom: 1px solid var(--border);
+    background: var(--surface); position: sticky; top: 0; z-index: 100;
+  }
+  .nav-logo { display: flex; align-items: center; gap: 10px; }
+  .logo-mark {
+    width: 32px; height: 32px; background: var(--accent);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  }
+  .logo-mark svg { width: 18px; height: 18px; }
+  .logo-text { font-family: var(--font); font-size: 15px; font-weight: 500; letter-spacing: -0.5px; }
+  .logo-text span { color: var(--accent); }
+  .nav-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .nav-meta { font-size: 12px; color: var(--muted); font-family: var(--font); }
+
+  /* HERO SEARCH */
+  .hero { padding: 48px 32px 32px; max-width: 1100px; margin: 0 auto; }
+  .hero-label { font-family: var(--font); font-size: 11px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+  .hero h1 { font-size: 28px; font-weight: 600; line-height: 1.3; margin-bottom: 8px; }
+  .hero h1 span { color: var(--accent); }
+  .hero-sub { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+
+  /* SEARCH PANEL */
+  .search-panel {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 14px; padding: 24px; margin-bottom: 32px;
+  }
+  .search-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-family: var(--font); }
+  .field input, .field select {
+    background: var(--surface2); border: 1px solid var(--border2); color: var(--text);
+    padding: 10px 14px; border-radius: 8px; font-size: 14px; font-family: var(--font2);
+    outline: none; transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field select option { background: var(--surface2); }
+  .search-btn {
+    background: var(--accent); color: #000; border: none; padding: 10px 24px;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+    font-family: var(--font2); transition: opacity 0.15s; white-space: nowrap;
+  }
+  .search-btn:hover { opacity: 0.85; }
+  .search-btn:active { transform: scale(0.98); }
+
+  /* FILTER CHIPS */
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .chip {
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; border: 1px solid var(--border2);
+    background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s;
+    font-family: var(--font);
+  }
+  .chip.active { background: rgba(0,212,170,0.12); border-color: var(--accent); color: var(--accent); }
+  .chip:hover { border-color: var(--text); color: var(--text); }
+
+  /* STATS BAR */
+  .stats-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    max-width: 1100px; margin: 0 auto 28px; padding: 0 32px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-family: var(--font); margin-bottom: 8px; }
+  .stat-value { font-size: 24px; font-weight: 600; font-family: var(--font); }
+  .stat-value.green { color: var(--success); }
+  .stat-value.amber { color: var(--warn); }
+  .stat-value.red { color: var(--danger); }
+  .stat-change { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: var(--font); }
+
+  /* RESULTS SECTION */
+  .results { max-width: 1100px; margin: 0 auto; padding: 0 32px 48px; }
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .results-title { font-size: 13px; font-weight: 500; color: var(--muted); font-family: var(--font); }
+  .results-title span { color: var(--text); }
+  .sort-select {
+    background: var(--surface); border: 1px solid var(--border2); color: var(--text);
+    padding: 6px 12px; border-radius: 8px; font-size: 12px; font-family: var(--font);
+    cursor: pointer;
+  }
+
+  /* RESULT CARDS */
+  .result-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 10px; transition: border-color 0.15s;
+    display: grid; grid-template-columns: auto 1fr auto auto; gap: 20px; align-items: center;
+  }
+  .result-card:hover { border-color: var(--border2); }
+  .result-card.open { border-left: 3px solid var(--success); }
+  .result-card.limited { border-left: 3px solid var(--warn); }
+  .result-card.closed { border-left: 3px solid var(--danger); opacity: 0.6; }
+
+  /* Provider badge */
+  .provider-badge {
+    width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center;
+    justify-content: center; font-family: var(--font); font-size: 10px; font-weight: 500;
+    text-align: center; line-height: 1.2;
+  }
+  .provider-badge.dcli { background: rgba(0,153,255,0.15); color: #0099ff; }
+  .provider-badge.trac { background: rgba(0,212,170,0.15); color: var(--accent); }
+  .provider-badge.flexi { background: rgba(245,158,11,0.15); color: var(--warn); }
+  .provider-badge.private { background: rgba(168,85,247,0.15); color: #a855f7; }
+
+  .card-main {}
+  .card-terminal { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .card-address { font-size: 12px; color: var(--muted); font-family: var(--font); margin-bottom: 8px; }
+  .card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag {
+    padding: 3px 8px; border-radius: 4px; font-size: 11px; font-family: var(--font);
+    border: 1px solid var(--border2); color: var(--muted);
+  }
+  .tag.size { border-color: rgba(0,153,255,0.3); color: var(--accent2); }
+
+  .card-avail { text-align: center; }
+  .avail-count { font-family: var(--font); font-size: 22px; font-weight: 500; }
+  .avail-count.green { color: var(--success); }
+  .avail-count.amber { color: var(--warn); }
+  .avail-count.red { color: var(--danger); }
+  .avail-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-family: var(--font); }
+
+  .card-actions { display: flex; flex-direction: column; gap: 8px; }
+  .btn-primary {
+    background: var(--accent); color: #000; border: none; padding: 8px 16px;
+    border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer;
+    font-family: var(--font2); white-space: nowrap;
+  }
+  .btn-secondary {
+    background: transparent; color: var(--muted); border: 1px solid var(--border2);
+    padding: 8px 16px; border-radius: 7px; font-size: 12px; cursor: pointer;
+    font-family: var(--font2); white-space: nowrap; transition: color 0.15s;
+  }
+  .btn-secondary:hover { color: var(--text); }
+
+  /* EXPAND DETAIL */
+  .card-detail {
+    display: none; margin-top: 16px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    grid-column: 1 / -1;
+  }
+  .card-detail.open { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .detail-group label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-family: var(--font); display: block; margin-bottom: 4px; }
+  .detail-value { font-size: 13px; font-family: var(--font); }
+  .release-code {
+    background: var(--surface2); border: 1px solid var(--border2); padding: 6px 12px;
+    border-radius: 6px; font-family: var(--font); font-size: 13px; color: var(--accent);
+    letter-spacing: 1px; display: inline-block; cursor: pointer;
+  }
+  .release-code:hover { background: rgba(0,212,170,0.1); }
+
+  /* FRESHNESS INDICATOR */
+  .fresh-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .fresh-dot.live { background: var(--success); }
+  .fresh-dot.stale { background: var(--warn); }
+  .fresh-dot.old { background: var(--danger); }
+
+  /* CROWDSOURCE BANNER */
+  .crowdsource-banner {
+    background: rgba(0,212,170,0.07); border: 1px solid rgba(0,212,170,0.2);
+    border-radius: var(--radius); padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .banner-text h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .banner-text p { font-size: 12px; color: var(--muted); }
+  .banner-btn {
+    background: var(--accent); color: #000; border: none; padding: 8px 20px;
+    border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+
+  /* MAP TOGGLE */
+  .view-toggle { display: flex; gap: 4px; background: var(--surface2); border-radius: 8px; padding: 3px; }
+  .view-btn { padding: 5px 12px; border-radius: 6px; border: none; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; font-family: var(--font); }
+  .view-btn.active { background: var(--surface); color: var(--text); }
+
+  /* EMPTY STATE */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-icon { font-size: 40px; margin-bottom: 16px; }
+  .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; max-width: 360px; margin: 0 auto; }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 40px; color: var(--muted); font-family: var(--font); font-size: 13px; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 10px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* REPORT MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 28px; width: 420px; max-width: 90vw; }
+  .modal h3 { font-size: 16px; margin-bottom: 4px; }
+  .modal p { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .modal-field { margin-bottom: 16px; }
+  .modal-field label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-family: var(--font); margin-bottom: 6px; }
+  .modal-field select, .modal-field input, .modal-field textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+    color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 13px;
+    font-family: var(--font2); outline: none; resize: vertical;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .modal-cancel { background: transparent; border: 1px solid var(--border2); color: var(--muted); padding: 8px 18px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+  .modal-submit { background: var(--accent); color: #000; border: none; padding: 8px 18px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; padding: 14px 20px; font-size: 13px; z-index: 300; transform: translateY(80px); opacity: 0; transition: all 0.3s; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: rgba(34,197,94,0.4); }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .nav { padding: 14px 20px; }
+    .hero { padding: 32px 20px 24px; }
+    .hero h1 { font-size: 22px; }
+    .search-row { grid-template-columns: 1fr 1fr; }
+    .search-btn { grid-column: 1/-1; }
+    .stats-bar { grid-template-columns: 1fr 1fr; padding: 0 20px; }
+    .results { padding: 0 20px 40px; }
+    .result-card { grid-template-columns: auto 1fr; gap: 12px; }
+    .card-avail, .card-actions { grid-column: 2; }
+    .card-detail.open { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 18 18" fill="none">
+        <rect x="1" y="8" width="16" height="4" rx="1" fill="#000"/>
+        <rect x="3" y="5" width="2" height="2" rx="0.5" fill="#000"/>
+        <rect x="13" y="5" width="2" height="2" rx="0.5" fill="#000"/>
+        <circle cx="4" cy="13" r="1.5" fill="#000"/>
+        <circle cx="14" cy="13" r="1.5" fill="#000"/>
+      </svg>
+    </div>
+    <span class="logo-text">Chassis<span>Find</span></span>
+  </div>
+  <div class="nav-status">
+    <span class="pulse"></span>
+    Live aggregation
+  </div>
+  <div class="nav-meta">Last sync: <span id="last-sync">just now</span></div>
+</nav>
+
+<!-- HERO SEARCH -->
+<div class="hero">
+  <div class="hero-label">Cross-provider chassis intelligence</div>
+  <h1>Find available chassis across <span>all providers</span>,<br>at every terminal, in one search</h1>
+  <p class="hero-sub">Aggregating DCLI, TRAC, Flexi-Van, and private fleets — updated continuously</p>
+
+  <div class="search-panel">
+    <div class="search-row">
+      <div class="field">
+        <label>Terminal / City / Zip</label>
+        <input type="text" id="search-location" placeholder="e.g. Chicago, Atlanta, 60601..." autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Chassis Size</label>
+        <select id="search-size">
+          <option value="all">All Sizes</option>
+          <option value="20">20'</option>
+          <option value="40">40'</option>
+          <option value="45">45'</option>
+          <option value="53">53' Domestic</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Provider</label>
+        <select id="search-provider">
+          <option value="all">All Providers</option>
+          <option value="DCLI">DCLI</option>
+          <option value="TRAC">TRAC</option>
+          <option value="FLEXI">Flexi-Van</option>
+          <option value="PRIVATE">Private</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Radius</label>
+        <select id="search-radius">
+          <option value="25">25 miles</option>
+          <option value="50" selected>50 miles</option>
+          <option value="100">100 miles</option>
+          <option value="200">200 miles</option>
+        </select>
+      </div>
+      <button class="search-btn" onclick="runSearch()">Search →</button>
+    </div>
+    <div class="filter-row">
+      <div class="filter-label" style="font-size:11px;color:var(--muted);align-self:center;font-family:var(--font);">Quick:</div>
+      <span class="chip active" onclick="quickFilter('open')">Open for pulls</span>
+      <span class="chip" onclick="quickFilter('available_now')">Available now</span>
+      <span class="chip" onclick="quickFilter('returns')">Open for returns</span>
+      <span class="chip" onclick="quickFilter('good_order')">Good order only</span>
+      <span class="chip" onclick="quickFilter('has_code')">Has release code</span>
+    </div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar" style="padding: 0; margin-bottom: 28px;">
+    <div class="stat-card">
+      <div class="stat-label">Terminals tracked</div>
+      <div class="stat-value" id="stat-terminals">247</div>
+      <div class="stat-change">↑ 12 this week</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Available chassis</div>
+      <div class="stat-value green" id="stat-available">1,842</div>
+      <div class="stat-change">Across all providers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg wait time</div>
+      <div class="stat-value amber" id="stat-wait">23 min</div>
+      <div class="stat-change">Driver-reported</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Dry run prevention</div>
+      <div class="stat-value green" id="stat-prevent">91%</div>
+      <div class="stat-change">vs. manual search</div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div class="results">
+
+  <!-- CROWDSOURCE BANNER -->
+  <div class="crowdsource-banner">
+    <div class="banner-text">
+      <h3>Help keep data real-time — report what you find</h3>
+      <p>Driver reports update availability instantly. 847 drivers contributed today.</p>
+    </div>
+    <button class="banner-btn" onclick="openReportModal()">Report Availability</button>
+  </div>
+
+  <div class="results-header">
+    <div class="results-title">Showing <span id="result-count">0</span> terminals</div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div class="view-toggle">
+        <button class="view-btn active" onclick="setView('list',this)">List</button>
+        <button class="view-btn" onclick="setView('map',this)">Map</button>
+      </div>
+      <select class="sort-select" onchange="sortResults(this.value)">
+        <option value="distance">Sort: Nearest</option>
+        <option value="availability">Most Available</option>
+        <option value="freshness">Most Recent</option>
+        <option value="wait">Shortest Wait</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="results-list">
+    <div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <h3>Search for chassis availability</h3>
+      <p>Enter a city, zip code, or terminal name above to see real-time chassis inventory across all providers</p>
+    </div>
+  </div>
+</div>
+
+<!-- REPORT MODAL -->
+<div class="modal-overlay" id="report-modal">
+  <div class="modal">
+    <h3>Report Chassis Availability</h3>
+    <p>Your report updates availability data instantly for all drivers</p>
+    <div class="modal-field">
+      <label>Terminal</label>
+      <input type="text" id="report-terminal" placeholder="Terminal name or SPLC code">
+    </div>
+    <div class="modal-field">
+      <label>What did you find?</label>
+      <select id="report-status">
+        <option value="available">Chassis available — pulled without issue</option>
+        <option value="limited">Limited — some available, long wait</option>
+        <option value="none">None available — dry run</option>
+        <option value="closed">Closed / not accepting pulls</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Chassis Size</label>
+      <select id="report-size">
+        <option value="40">40'</option>
+        <option value="20">20'</option>
+        <option value="45">45'</option>
+        <option value="53">53' Domestic</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Wait time (minutes)</label>
+      <input type="number" id="report-wait" placeholder="0" min="0" max="300">
+    </div>
+    <div class="modal-field">
+      <label>Notes (optional)</label>
+      <textarea id="report-notes" rows="2" placeholder="e.g. Check east row, good order units available..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeReportModal()">Cancel</button>
+      <button class="modal-submit" onclick="submitReport()">Submit Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── MOCK DATA LAYER ─────────────────────────────────────────────────────────
+// In production: replace fetchChassisData() with real scrapers / API calls
+// Data sources: DCLI regional pages, TRAC portal, Flexi-Van, OpenTrack API
+
+const MOCK_TERMINALS = [
+  {
+    id: 1, provider: 'DCLI', terminal: 'Chicago Ashland Ave (CXCHICA)', city: 'Chicago', state: 'IL',
+    address: '3500 S. Ashland Ave, Chicago, IL 60608', lat: 41.826, lng: -87.667,
+    sizes: ['20','40','45'], status: 'open',
+    inventory: { '20': 12, '40': 34, '45': 8, '53': 0 },
+    openForPulls: true, openForReturns: true,
+    releaseCode: 'CHAS2026', waitMinutes: 15,
+    notes: 'Check east row for 40\' units. Good order chassis available.',
+    lastUpdated: new Date(Date.now() - 18*60000), dataSource: 'scrape',
+    driverReports: 7, region: 'Midwest'
+  },
+  {
+    id: 2, provider: 'TRAC', terminal: 'Atlanta Inman Yard (NSATLIN)', city: 'Atlanta', state: 'GA',
+    address: '100 Inman Way SW, Atlanta, GA 30313', lat: 33.734, lng: -84.431,
+    sizes: ['40','53'], status: 'limited',
+    inventory: { '20': 0, '40': 6, '45': 0, '53': 3 },
+    openForPulls: true, openForReturns: true,
+    releaseCode: 'ATL2026B', waitMinutes: 45,
+    notes: 'Limited 40\' available. 53\' domestic open. Returns welcome.',
+    lastUpdated: new Date(Date.now() - 4*60000), dataSource: 'crowdsource',
+    driverReports: 12, region: 'Southeast'
+  },
+  {
+    id: 3, provider: 'DCLI', terminal: 'Memphis BNSF Ramp (BMEMRMP)', city: 'Memphis', state: 'TN',
+    address: '4799 E. Raines Rd, Memphis, TN 38118', lat: 35.038, lng: -90.013,
+    sizes: ['20','40','45','53'], status: 'open',
+    inventory: { '20': 22, '40': 58, '45': 14, '53': 19 },
+    openForPulls: true, openForReturns: true,
+    releaseCode: 'MEM2026', waitMinutes: 8,
+    notes: 'High inventory across all sizes. Smooth operations today.',
+    lastUpdated: new Date(Date.now() - 2*60000), dataSource: 'api',
+    driverReports: 3, region: 'Southeast'
+  },
+  {
+    id: 4, provider: 'FLEXI', terminal: 'Newark CSX Terminal (CSXNWKN)', city: 'Newark', state: 'NJ',
+    address: '100 Doremus Ave, Newark, NJ 07105', lat: 40.717, lng: -74.148,
+    sizes: ['20','40'], status: 'open',
+    inventory: { '20': 18, '40': 29, '45': 0, '53': 0 },
+    openForPulls: true, openForReturns: false,
+    releaseCode: 'NWK2026A', waitMinutes: 22,
+    notes: 'CLOSED for returns — bring empties to Port Newark instead.',
+    lastUpdated: new Date(Date.now() - 35*60000), dataSource: 'scrape',
+    driverReports: 5, region: 'Northeast'
+  },
+  {
+    id: 5, provider: 'TRAC', terminal: 'Charlotte Inland Port (CSXCHLT)', city: 'Charlotte', state: 'NC',
+    address: '3501 W. Trade St, Charlotte, NC 28208', lat: 35.228, lng: -80.876,
+    sizes: ['40','53'], status: 'open',
+    inventory: { '20': 0, '40': 41, '45': 0, '53': 27 },
+    openForPulls: true, openForReturns: true,
+    releaseCode: 'CLT2026', waitMinutes: 12,
+    notes: 'Excellent 53\' domestic availability. 40\' well stocked.',
+    lastUpdated: new Date(Date.now() - 9*60000), dataSource: 'api',
+    driverReports: 9, region: 'Southeast'
+  },
+  {
+    id: 6, provider: 'DCLI', terminal: 'Columbus Buckeye Yard (CSCOLVK)', city: 'Columbus', state: 'OH',
+    address: '2500 S. High St, Columbus, OH 43207', lat: 39.937, lng: -82.999,
+    sizes: ['20','40','45'], status: 'limited',
+    inventory: { '20': 2, '40': 7, '45': 3, '53': 0 },
+    openForPulls: true, openForReturns: true,
+    releaseCode: null, waitMinutes: 55,
+    notes: 'Tight on 20\' — check back after 2pm. 40\' trickling in.',
+    lastUpdated: new Date(Date.now() - 62*60000), dataSource: 'crowdsource',
+    driverReports: 4, region: 'Midwest'
+  },
+  {
+    id: 7, provider: 'PRIVATE', terminal: 'Louisville CSX Hub (CSXLUVK)', city: 'Louisville', state: 'KY',
+    address: '900 E. Main St, Louisville, KY 40206', lat: 38.249, lng: -85.739,
+    sizes: ['53'], status: 'open',
+    inventory: { '20': 0, '40': 0, '45': 0, '53': 15 },
+    openForPulls: true, openForReturns: true,
+    releaseCode: 'LOU2026P', waitMinutes: 5,
+    notes: 'Private fleet — 53\' domestic only. Fast turnaround.',
+    lastUpdated: new Date(Date.now() - 1*60000), dataSource: 'crowdsource',
+    driverReports: 6, region: 'Southeast'
+  },
+  {
+    id: 8, provider: 'TRAC', terminal: 'Philadelphia South Kearny (CSXPHINK)', city: 'Philadelphia', state: 'PA',
+    address: '555 Industrial Blvd, Philadelphia, PA 19112', lat: 39.879, lng: -75.180,
+    sizes: ['20','40'], status: 'closed',
+    inventory: { '20': 0, '40': 0, '45': 0, '53': 0 },
+    openForPulls: false, openForReturns: true,
+    releaseCode: null, waitMinutes: null,
+    notes: 'Closed for pulls until further notice. Returns accepted.',
+    lastUpdated: new Date(Date.now() - 3*3600000), dataSource: 'scrape',
+    driverReports: 2, region: 'Northeast'
+  },
+  {
+    id: 9, provider: 'DCLI', terminal: 'Nashville Terminal (CSXNSHVK)', city: 'Nashville', state: 'TN',
+    address: '1400 Lebanon Pike, Nashville, TN 37210', lat: 36.154, lng: -86.736,
+    sizes: ['40','53'], status: 'open',
+    inventory: { '20': 0, '40': 33, '45': 0, '53': 21 },
+    openForPulls: true, openForReturns: true,
+    releaseCode: 'NSH2026', waitMinutes: 18,
+    notes: 'Growing hub — good availability both 40\' and 53\' domestic.',
+    lastUpdated: new Date(Date.now() - 7*60000), dataSource: 'api',
+    driverReports: 8, region: 'Southeast'
+  },
+  {
+    id: 10, provider: 'FLEXI', terminal: 'Syracuse Intermodal (CSXSYRNA)', city: 'Syracuse', state: 'NY',
+    address: '300 Erie Blvd W, Syracuse, NY 13204', lat: 43.048, lng: -76.148,
+    sizes: ['40'], status: 'limited',
+    inventory: { '20': 0, '40': 4, '45': 0, '53': 0 },
+    openForPulls: true, openForReturns: false,
+    releaseCode: 'SYR2026', waitMinutes: 40,
+    notes: '40\' only. Low stock — arrive early morning for best availability.',
+    lastUpdated: new Date(Date.now() - 28*60000), dataSource: 'scrape',
+    driverReports: 3, region: 'Northeast'
+  }
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let currentResults = [];
+let activeFilters = new Set(['open']);
+let currentSort = 'distance';
+let currentView = 'list';
+let expandedCards = new Set();
+
+// ─── SEARCH ──────────────────────────────────────────────────────────────────
+function runSearch() {
+  const location = document.getElementById('search-location').value.toLowerCase().trim();
+  const size = document.getElementById('search-size').value;
+  const provider = document.getElementById('search-provider').value;
+
+  showLoading();
+
+  // Simulate async data fetch (in production: real API/scraper calls)
+  setTimeout(() => {
+    let results = [...MOCK_TERMINALS];
+
+    // Filter by location
+    if (location) {
+      results = results.filter(t =>
+        t.city.toLowerCase().includes(location) ||
+        t.state.toLowerCase().includes(location) ||
+        t.terminal.toLowerCase().includes(location) ||
+        t.address.toLowerCase().includes(location) ||
+        t.id.toString() === location
+      );
+    }
+
+    // Filter by size
+    if (size !== 'all') {
+      results = results.filter(t => t.sizes.includes(size));
+    }
+
+    // Filter by provider
+    if (provider !== 'all') {
+      results = results.filter(t => t.provider === provider);
+    }
+
+    // Apply quick filters
+    if (activeFilters.has('open')) {
+      results = results.filter(t => t.openForPulls);
+    }
+    if (activeFilters.has('returns')) {
+      results = results.filter(t => t.openForReturns);
+    }
+    if (activeFilters.has('available_now')) {
+      results = results.filter(t => getTotalInventory(t) > 0);
+    }
+    if (activeFilters.has('has_code')) {
+      results = results.filter(t => t.releaseCode);
+    }
+
+    currentResults = sortData(results, currentSort);
+    renderResults(currentResults, size);
+    updateStats(results);
+  }, 600);
+}
+
+function showLoading() {
+  document.getElementById('results-list').innerHTML = `
+    <div class="loading"><span class="spinner"></span>Aggregating live data from DCLI, TRAC, Flexi-Van...</div>
+  `;
+}
+
+function getTotalInventory(terminal, size = 'all') {
+  if (size === 'all') return Object.values(terminal.inventory).reduce((a, b) => a + b, 0);
+  return terminal.inventory[size] || 0;
+}
+
+function sortData(data, method) {
+  return [...data].sort((a, b) => {
+    switch(method) {
+      case 'availability': return getTotalInventory(b) - getTotalInventory(a);
+      case 'freshness': return b.lastUpdated - a.lastUpdated;
+      case 'wait': return (a.waitMinutes || 999) - (b.waitMinutes || 999);
+      default: return a.id - b.id; // distance proxy
+    }
+  });
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function renderResults(results, filterSize = 'all') {
+  const container = document.getElementById('results-list');
+  document.getElementById('result-count').textContent = results.length;
+
+  if (results.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <h3>No terminals found</h3>
+        <p>Try expanding your search radius, changing the chassis size, or removing filters</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = results.map(t => renderCard(t, filterSize)).join('');
+}
+
+function renderCard(t, filterSize) {
+  const total = getTotalInventory(t, filterSize);
+  const freshness = getFreshness(t.lastUpdated);
+  const isExpanded = expandedCards.has(t.id);
+
+  const statusClass = t.status === 'open' ? 'open' : t.status === 'limited' ? 'limited' : 'closed';
+  const countClass = total > 20 ? 'green' : total > 5 ? 'amber' : 'red';
+
+  const providerLabel = { DCLI: 'DCLI', TRAC: 'TRAC', FLEXI: 'FLEXI-\nVAN', PRIVATE: 'PRIVATE' };
+  const providerClass = t.provider.toLowerCase();
+
+  const sizeTagsHtml = t.sizes.map(s =>
+    `<span class="tag size">${s}'${s === '53' ? ' dom' : ''}</span>`
+  ).join('');
+
+  const sourceLabel = { scrape: 'Web scrape', api: 'API feed', crowdsource: 'Driver report' };
+
+  return `
+    <div class="result-card ${statusClass}" id="card-${t.id}">
+      <div class="provider-badge ${providerClass}">${providerLabel[t.provider]}</div>
+      <div class="card-main">
+        <div class="card-terminal">${t.terminal}</div>
+        <div class="card-address">${t.address}</div>
+        <div class="card-tags">
+          ${sizeTagsHtml}
+          ${t.openForPulls ? '<span class="tag" style="border-color:rgba(34,197,94,0.3);color:#22c55e;">✓ Pulls open</span>' : ''}
+          ${t.openForReturns ? '<span class="tag" style="border-color:rgba(0,153,255,0.3);color:#0099ff;">↩ Returns open</span>' : ''}
+          <span class="tag"><span class="fresh-dot ${freshness.cls}"></span>${freshness.label}</span>
+          <span class="tag" style="cursor:default;">${sourceLabel[t.dataSource]}</span>
+        </div>
+      </div>
+      <div class="card-avail">
+        <div class="avail-count ${countClass}">${total === 0 ? '—' : total}</div>
+        <div class="avail-label">${filterSize === 'all' ? 'total units' : filterSize + "' units"}</div>
+      </div>
+      <div class="card-actions">
+        <button class="btn-primary" onclick="getDirections(${t.id})">Get Directions</button>
+        <button class="btn-secondary" onclick="toggleDetail(${t.id})">${isExpanded ? 'Hide' : 'Details'}</button>
+      </div>
+      <div class="card-detail ${isExpanded ? 'open' : ''}" id="detail-${t.id}">
+        <div class="detail-group">
+          <label>Inventory breakdown</label>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px;">
+            ${[20,40,45,53].map(s => `
+              <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center;">
+                <div style="font-size:10px;color:var(--muted);font-family:var(--font);">${s}'</div>
+                <div style="font-size:16px;font-family:var(--font);font-weight:500;color:${t.inventory[s] > 0 ? 'var(--success)' : 'var(--muted)'};">${t.inventory[s]}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="detail-group">
+          <label>Release Code</label>
+          ${t.releaseCode
+            ? `<span class="release-code" onclick="copyCode('${t.releaseCode}')" title="Click to copy">${t.releaseCode} 📋</span>`
+            : '<span style="color:var(--muted);font-size:13px;font-family:var(--font);">Contact terminal directly</span>'
+          }
+          <div style="margin-top:12px;">
+            <label>Avg wait time</label>
+            <div class="detail-value" style="color:${t.waitMinutes < 20 ? 'var(--success)' : t.waitMinutes < 45 ? 'var(--warn)' : 'var(--danger)'};">
+              ${t.waitMinutes !== null ? t.waitMinutes + ' min' : 'No data yet'}
+            </div>
+          </div>
+        </div>
+        <div class="detail-group">
+          <label>Driver notes</label>
+          <div style="font-size:13px;color:var(--muted);line-height:1.5;font-family:var(--font);">${t.notes}</div>
+          <div style="margin-top:12px;">
+            <label>Driver reports (today)</label>
+            <div class="detail-value" style="color:var(--accent);">${t.driverReports} confirmations</div>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border);">
+          <button class="btn-secondary" onclick="openReportModalFor(${t.id})" style="font-size:12px;">+ Report availability</button>
+          <button class="btn-secondary" onclick="copyCode('${t.terminal}')" style="font-size:12px;">Copy terminal code</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function getFreshness(date) {
+  const mins = (Date.now() - date) / 60000;
+  if (mins < 30) return { cls: 'live', label: Math.round(mins) + 'm ago' };
+  if (mins < 120) return { cls: 'stale', label: Math.round(mins) + 'm ago' };
+  return { cls: 'old', label: Math.round(mins/60) + 'h ago' };
+}
+
+// ─── INTERACTIONS ────────────────────────────────────────────────────────────
+function toggleDetail(id) {
+  if (expandedCards.has(id)) {
+    expandedCards.delete(id);
+  } else {
+    expandedCards.add(id);
+  }
+  // Re-render just this card's detail
+  const detail = document.getElementById('detail-' + id);
+  const btn = document.querySelector(`#card-${id} .btn-secondary`);
+  if (detail) {
+    detail.classList.toggle('open', expandedCards.has(id));
+    if (btn) btn.textContent = expandedCards.has(id) ? 'Hide' : 'Details';
+  }
+}
+
+function getDirections(id) {
+  const t = MOCK_TERMINALS.find(t => t.id === id);
+  if (!t) return;
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.address)}`;
+  window.open(url, '_blank');
+}
+
+function copyCode(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Copied: ' + text, 'success');
+  });
+}
+
+function sortResults(method) {
+  currentSort = method;
+  if (currentResults.length) {
+    currentResults = sortData(currentResults, method);
+    const size = document.getElementById('search-size').value;
+    renderResults(currentResults, size);
+  }
+}
+
+function setView(view, btn) {
+  currentView = view;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (view === 'map') {
+    showToast('Map view coming in Phase 2 — showing list view', '');
+  }
+}
+
+function quickFilter(filter) {
+  const chips = document.querySelectorAll('.chip');
+  chips.forEach(chip => {
+    const action = chip.getAttribute('onclick').match(/'([^']+)'/)[1];
+    if (action === filter) {
+      chip.classList.toggle('active');
+      if (chip.classList.contains('active')) activeFilters.add(filter);
+      else activeFilters.delete(filter);
+    }
+  });
+  if (currentResults.length > 0 || document.getElementById('search-location').value) {
+    runSearch();
+  }
+}
+
+function updateStats(results) {
+  const total = results.reduce((sum, t) => sum + getTotalInventory(t), 0);
+  const avgWait = results.filter(t => t.waitMinutes).reduce((s, t, i, a) => s + t.waitMinutes/a.length, 0);
+  document.getElementById('stat-available').textContent = total.toLocaleString();
+  document.getElementById('stat-wait').textContent = Math.round(avgWait) + ' min';
+}
+
+// ─── REPORT MODAL ────────────────────────────────────────────────────────────
+function openReportModal() {
+  document.getElementById('report-modal').classList.add('open');
+}
+function openReportModalFor(id) {
+  const t = MOCK_TERMINALS.find(t => t.id === id);
+  if (t) document.getElementById('report-terminal').value = t.terminal;
+  openReportModal();
+}
+function closeReportModal() {
+  document.getElementById('report-modal').classList.remove('open');
+}
+function submitReport() {
+  const terminal = document.getElementById('report-terminal').value;
+  const status = document.getElementById('report-status').value;
+  if (!terminal) { showToast('Please enter a terminal name', ''); return; }
+  closeReportModal();
+  showToast('Report submitted — data updated in real time!', 'success');
+  // In production: POST to /api/reports with the report data
+  // Update the local data and re-render
+  document.getElementById('stat-terminals').textContent = '248';
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast ' + type;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ─── KEYBOARD ────────────────────────────────────────────────────────────────
+document.getElementById('search-location').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runSearch();
+});
+document.getElementById('report-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeReportModal();
+});
+
+// ─── SYNC CLOCK ──────────────────────────────────────────────────────────────
+function updateSyncTime() {
+  const now = new Date();
+  document.getElementById('last-sync').textContent =
+    now.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateSyncTime, 1000);
+updateSyncTime();
+
+// ─── AUTO-DEMO on load ───────────────────────────────────────────────────────
+// Show all terminals on page load as a demo
+window.addEventListener('load', () => {
+  currentResults = sortData(MOCK_TERMINALS, 'distance');
+  renderResults(currentResults, 'all');
+  document.getElementById('result-count').textContent = currentResults.length;
+});
+</script>
+</body>
+</html>
